@@ -70,14 +70,14 @@ public final class EditorScreen extends Screen {
         session = effect;
         selected = 0;
         listOffset = 0;
-        Minecraft.getInstance().setScreen(new EditorScreen());
+        Minecraft.getInstance().gui.setScreen(new EditorScreen());
     }
 
     public static void openLast() {
         if (session == null) {
             session = EffectDefinition.createDefault("untitled");
         }
-        Minecraft.getInstance().setScreen(new EditorScreen());
+        Minecraft.getInstance().gui.setScreen(new EditorScreen());
     }
 
     public boolean isPauseScreen() {
@@ -117,15 +117,13 @@ public final class EditorScreen extends Screen {
         EditBox idBox = new EditBox(this.font, 8, 6, 110, 18, Component.literal("Effect id"));
         idBox.setMaxLength(32);
         idBox.setValue(session.id);
-        idBox.setFilter(s -> s.matches("[a-zA-Z0-9_\\-]*"));
-        idBox.setResponder(s -> session.id = s);
+        FormBuilder.bind(idBox, s -> s.matches("[a-zA-Z0-9_\\-]*"), s -> session.id = s);
         addRenderableWidget(idBox);
 
         EditBox duration = new EditBox(this.font, 152, 6, 36, 18, Component.literal("Duration"));
         duration.setMaxLength(5);
         duration.setValue(Integer.toString(session.duration));
-        duration.setFilter(s -> s.matches("\\d*"));
-        duration.setResponder(s -> {
+        FormBuilder.bind(duration, s -> s.matches(FormBuilder.UNSIGNED_INT), s -> {
             try {
                 session.duration = Math.max(1, Integer.parseInt(s));
             } catch (NumberFormatException ignored) {
@@ -337,6 +335,6 @@ public final class EditorScreen extends Screen {
 
     @Override
     public void onClose() {
-        this.minecraft.setScreen(null);
+        this.minecraft.gui.setScreen(null);
     }
 }

@@ -23,9 +23,36 @@ public final class Gradient {
         return gradient;
     }
 
+    public void sort() {
+        stops.sort(Comparator.comparingDouble(ColorStop::time));
+    }
+
     public void add(float time, int rgb) {
         stops.add(new ColorStop(clamp01(time), rgb & 0xFFFFFF));
-        stops.sort(Comparator.comparingDouble(ColorStop::time));
+        sort();
+    }
+
+    public void addMidpoint() {
+        sort();
+        float bestStart = 0f;
+        float bestEnd = 1f;
+        float bestGap = -1f;
+        float prev = 0f;
+        for (ColorStop stop : stops) {
+            float gap = stop.time() - prev;
+            if (gap > bestGap) {
+                bestGap = gap;
+                bestStart = prev;
+                bestEnd = stop.time();
+            }
+            prev = stop.time();
+        }
+        if (1f - prev > bestGap) {
+            bestStart = prev;
+            bestEnd = 1f;
+        }
+        float t = (bestStart + bestEnd) / 2f;
+        add(t, evaluate(t));
     }
 
     public void removeAt(int index) {
@@ -39,7 +66,7 @@ public final class Gradient {
             return;
         }
         stops.set(index, new ColorStop(clamp01(time), rgb & 0xFFFFFF));
-        stops.sort(Comparator.comparingDouble(ColorStop::time));
+        sort();
     }
 
     public int evaluate(float t) {

@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.IntSupplier;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 public final class FormBuilder {
@@ -30,6 +31,12 @@ public final class FormBuilder {
     private static final int MAX_KEYS = 8;
     private static final int TEXT_OK = 0xFFE0E0E0;
     private static final int TEXT_BAD = 0xFFFF5555;
+
+    public static final String SIGNED_FLOAT = "-?\\d*\\.?\\d*";
+    public static final String UNSIGNED_FLOAT = "\\d*\\.?\\d*";
+    public static final String SIGNED_INT = "-?\\d*";
+    public static final String UNSIGNED_INT = "\\d*";
+    public static final String HEX = "[0-9a-fA-F]{0,6}";
 
     private record Label(String text, int x, int y, int color) {
     }
@@ -92,16 +99,14 @@ public final class FormBuilder {
 
     public void number(String label, float value, Consumer<Float> setter) {
         EditBox box = cellBox(label, formatFloat(value), 12);
-        box.setFilter(s -> s.matches("-?\\d*\\.?\\d*"));
-        box.setResponder(s -> parseFloat(s, setter));
+        bind(box, s -> s.matches(SIGNED_FLOAT), s -> parseFloat(s, setter));
         adder.accept(box);
         advance();
     }
 
     public void integer(String label, int value, Consumer<Integer> setter) {
         EditBox box = cellBox(label, Integer.toString(value), 9);
-        box.setFilter(s -> s.matches("-?\\d*"));
-        box.setResponder(s -> parseInt(s, setter));
+        bind(box, s -> s.matches(SIGNED_INT), s -> parseInt(s, setter));
         adder.accept(box);
         advance();
     }
@@ -169,14 +174,12 @@ public final class FormBuilder {
             int index = i;
             Keyframe key = curve.keys.get(i);
             EditBox time = rawBox(left, 64, formatFloat(key.time()), 10);
-            time.setFilter(s -> s.matches("\\d*\\.?\\d*"));
-            time.setResponder(s -> parseFloat(s, v -> {
+            bind(time, s -> s.matches(UNSIGNED_FLOAT), s -> parseFloat(s, v -> {
                 Keyframe old = curve.keys.get(index);
                 curve.keys.set(index, new Keyframe(Math.max(0f, Math.min(1f, v)), old.value()));
             }));
             EditBox value = rawBox(left + 68, 80, formatFloat(key.value()), 12);
-            value.setFilter(s -> s.matches("-?\\d*\\.?\\d*"));
-            value.setResponder(s -> parseFloat(s, v -> {
+            bind(value, s -> s.matches(SIGNED_FLOAT), s -> parseFloat(s, v -> {
                 Keyframe old = curve.keys.get(index);
                 curve.keys.set(index, new Keyframe(old.time(), v));
             }));
@@ -206,14 +209,12 @@ public final class FormBuilder {
             int index = i;
             ColorStop stop = gradient.stops.get(i);
             EditBox time = rawBox(left, 64, formatFloat(stop.time()), 10);
-            time.setFilter(s -> s.matches("\\d*\\.?\\d*"));
-            time.setResponder(s -> parseFloat(s, v -> {
+            bind(time, s -> s.matches(UNSIGNED_FLOAT), s -> parseFloat(s, v -> {
                 ColorStop old = gradient.stops.get(index);
                 gradient.stops.set(index, new ColorStop(Math.max(0f, Math.min(1f, v)), old.rgb()));
             }));
             EditBox hex = rawBox(left + 68, 64, String.format(Locale.ROOT, "%06X", stop.rgb()), 6);
-            hex.setFilter(s -> s.matches("[0-9a-fA-F]{0,6}"));
-            hex.setResponder(s -> {
+            bind(hex, s -> s.matches(HEX), s -> {
                 if (s.length() == 6) {
                     int rgb = Integer.parseInt(s, 16);
                     ColorStop old = gradient.stops.get(index);
@@ -241,6 +242,16 @@ public final class FormBuilder {
         add.active = gradient.stops.size() < MAX_KEYS;
         adder.accept(add);
         y += ROW + GAP;
+    }
+
+    public static void bind(EditBox box, Predicate<String> valid, Consumer<String> onValid) {
+        box.setResponder(s -> {
+            boolean ok = valid.test(s);
+            box.setTextColor(ok ? TEXT_OK : TEXT_BAD);
+            if (ok) {
+                onValid.accept(s);
+            }
+        });
     }
 
     private void stepParticle(EditBox box, int direction) {

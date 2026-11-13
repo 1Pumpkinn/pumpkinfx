@@ -23,9 +23,36 @@ public final class Curve {
         return curve;
     }
 
+    public void sort() {
+        keys.sort(Comparator.comparingDouble(Keyframe::time));
+    }
+
     public void add(float time, float value) {
         keys.add(new Keyframe(clamp01(time), value));
-        keys.sort(Comparator.comparingDouble(Keyframe::time));
+        sort();
+    }
+
+    public void addMidpoint() {
+        sort();
+        float bestStart = 0f;
+        float bestEnd = 1f;
+        float bestGap = -1f;
+        float prev = 0f;
+        for (Keyframe key : keys) {
+            float gap = key.time() - prev;
+            if (gap > bestGap) {
+                bestGap = gap;
+                bestStart = prev;
+                bestEnd = key.time();
+            }
+            prev = key.time();
+        }
+        if (1f - prev > bestGap) {
+            bestStart = prev;
+            bestEnd = 1f;
+        }
+        float t = (bestStart + bestEnd) / 2f;
+        add(t, evaluate(t));
     }
 
     public void removeAt(int index) {
@@ -39,7 +66,7 @@ public final class Curve {
             return;
         }
         keys.set(index, new Keyframe(clamp01(time), value));
-        keys.sort(Comparator.comparingDouble(Keyframe::time));
+        sort();
     }
 
     public float evaluate(float t) {

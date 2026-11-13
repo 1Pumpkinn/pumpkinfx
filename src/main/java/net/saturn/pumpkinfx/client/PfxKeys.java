@@ -7,6 +7,7 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.saturn.pumpkinfx.PumpkinFxClient;
+import net.saturn.pumpkinfx.client.editor.EditorScreen;
 import org.lwjgl.glfw.GLFW;
 
 public final class PfxKeys {
@@ -14,6 +15,7 @@ public final class PfxKeys {
             Identifier.fromNamespaceAndPath(PumpkinFxClient.MOD_ID, "main"));
 
     private static KeyMapping replayKey;
+    private static KeyMapping openKey;
 
     private PfxKeys() {
     }
@@ -23,6 +25,11 @@ public final class PfxKeys {
                 "key.pumpkinfx.replay",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_P,
+                CATEGORY));
+        openKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+                "key.pumpkinfx.open",
+                InputConstants.Type.KEYSYM,
+                GLFW.GLFW_KEY_O,
                 CATEGORY));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
@@ -34,6 +41,11 @@ public final class PfxKeys {
                     client.player.sendSystemMessage(Component.literal("PumpkinFX: nothing to replay yet, use /pfx play <id>"));
                 } else {
                     EffectPreview.replay();
+                }
+            }
+            while (openKey.consumeClick()) {
+                if (client.player != null && client.gui.screen() == null) {
+                    EditorScreen.openLast();
                 }
             }
         });

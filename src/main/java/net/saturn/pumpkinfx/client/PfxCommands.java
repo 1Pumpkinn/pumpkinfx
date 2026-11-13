@@ -7,6 +7,7 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallba
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.network.chat.Component;
+import net.saturn.pumpkinfx.client.editor.EditorScreen;
 import net.saturn.pumpkinfx.model.EffectDefinition;
 import net.saturn.pumpkinfx.model.EffectIds;
 import net.saturn.pumpkinfx.storage.EffectStore;
@@ -23,6 +24,14 @@ public final class PfxCommands {
                 dispatcher.register(ClientCommands.literal("pfx")
                         .then(ClientCommands.literal("list").executes(PfxCommands::list))
                         .then(ClientCommands.literal("stop").executes(PfxCommands::stop))
+                        .then(ClientCommands.literal("edit")
+                                .executes(PfxCommands::editLast)
+                                .then(ClientCommands.argument("id", StringArgumentType.word())
+                                        .suggests((ctx, builder) -> {
+                                            EffectStore.list().forEach(builder::suggest);
+                                            return builder.buildFuture();
+                                        })
+                                        .executes(PfxCommands::edit)))
                         .then(ClientCommands.literal("new")
                                 .then(ClientCommands.argument("id", StringArgumentType.word())
                                         .executes(PfxCommands::create)))
@@ -42,6 +51,28 @@ public final class PfxCommands {
         } else {
             ctx.getSource().sendFeedback(Component.literal("Effects: " + String.join(", ", ids)));
         }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int editLast(CommandContext<FabricClientCommandSource> ctx) {
+        PendingActions.defer(EditorScreen::openLast);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int edit(CommandContext<FabricClientCommandSource> ctx) {
+        String id = EffectIds.sanitize(StringArgumentType.getString(ctx, "id"));
+        if (!EffectStore.exists(id)) {
+            ctx.getSource().sendError(Component.literal("No effect named '" + id + "'"));
+            return 0;
+        }
+        EffectDefinition loaded;
+        try {
+            loaded = EffectStore.load(id);
+        } catch (Exception e) {
+            ctx.getSource().sendError(Component.literal("Could not load '" + id + "': " + e.getMessage()));
+            return 0;
+        }
+        PendingActions.defer(() -> EditorScreen.open(loaded));
         return Command.SINGLE_SUCCESS;
     }
 

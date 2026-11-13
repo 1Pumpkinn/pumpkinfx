@@ -69,6 +69,10 @@ public final class EmitterDefinition {
         if (color == null || color.stops == null || color.stops.isEmpty()) {
             color = Gradient.solid(0xFFFFFF);
         }
+        rate.sort();
+        speed.sort();
+        size.sort();
+        color.sort();
         duration = Math.max(1, duration);
         startDelay = Math.max(0, startDelay);
         burstCount = Math.max(0, burstCount);
