@@ -7,6 +7,9 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.saturn.pumpkinfx.client.EffectPreview;
+import net.saturn.pumpkinfx.PumpkinFxClient;
+import net.saturn.pumpkinfx.export.ExportService;
+import net.saturn.pumpkinfx.export.PackExporter;
 import net.saturn.pumpkinfx.model.DirectionMode;
 import net.saturn.pumpkinfx.model.EffectDefinition;
 import net.saturn.pumpkinfx.model.EmitterDefinition;
@@ -136,10 +139,13 @@ public final class EditorScreen extends Screen {
             b.setMessage(Component.literal(loopLabel()));
         }).bounds(192, 6, 54, 18).build());
 
-        int w = 38;
+        int w = 36;
         int x = this.width - 8 - w;
         addRenderableWidget(Button.builder(Component.literal("Done"), b -> onClose())
                 .bounds(x, 6, w, 18).build());
+        x -= 48;
+        addRenderableWidget(Button.builder(Component.literal("Export"), b -> export())
+                .bounds(x, 6, 44, 18).build());
         x -= w + 4;
         addRenderableWidget(Button.builder(Component.literal("Save"), b -> save())
                 .bounds(x, 6, w, 18).build());
@@ -329,6 +335,23 @@ public final class EditorScreen extends Screen {
             status = "Saved '" + session.id + "'";
         } catch (IOException e) {
             status = "Save failed: " + e.getMessage();
+        }
+        rebuildWidgets();
+    }
+
+    private void export() {
+        session.normalize();
+        try {
+            EffectStore.save(session);
+            PackExporter.Result result = ExportService.exportAll(ExportService.lastName());
+            status = "Exported " + result.effectCount() + " effects, " + result.textureCount()
+                    + " textures to " + result.zip().getParent();
+            if (!result.warnings().isEmpty()) {
+                status += " (" + result.warnings().size() + " warnings, see log)";
+                result.warnings().forEach(w -> PumpkinFxClient.LOGGER.warn("Export: {}", w));
+            }
+        } catch (IOException e) {
+            status = "Export failed: " + e.getMessage();
         }
         rebuildWidgets();
     }

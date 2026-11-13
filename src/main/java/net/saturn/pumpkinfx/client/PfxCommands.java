@@ -8,6 +8,9 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.network.chat.Component;
 import net.saturn.pumpkinfx.client.editor.EditorScreen;
+import net.saturn.pumpkinfx.export.ExportService;
+import net.saturn.pumpkinfx.export.PackExporter;
+import net.saturn.pumpkinfx.graph.GraphPresets;
 import net.saturn.pumpkinfx.model.EffectDefinition;
 import net.saturn.pumpkinfx.model.EffectIds;
 import net.saturn.pumpkinfx.storage.EffectStore;
@@ -32,6 +35,11 @@ public final class PfxCommands {
                                             return builder.buildFuture();
                                         })
                                         .executes(PfxCommands::edit)))
+                        .then(ClientCommands.literal("export")
+                                .executes(ctx -> export(ctx, ExportService.lastName()))
+                                .then(ClientCommands.argument("name", StringArgumentType.word())
+                                        .executes(ctx -> export(ctx, StringArgumentType.getString(ctx, "name")))))
+                        .then(ClientCommands.literal("demo").executes(PfxCommands::demo))
                         .then(ClientCommands.literal("new")
                                 .then(ClientCommands.argument("id", StringArgumentType.word())
                                         .executes(PfxCommands::create)))
@@ -73,6 +81,36 @@ public final class PfxCommands {
             return 0;
         }
         PendingActions.defer(() -> EditorScreen.open(loaded));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int export(CommandContext<FabricClientCommandSource> ctx, String name) {
+        try {
+            PackExporter.Result result = ExportService.exportAll(name);
+            ctx.getSource().sendFeedback(Component.literal("Exported " + result.effectCount() + " effects, "
+                    + result.textureCount() + " textures, " + result.overlayCount() + " pack files"));
+            ctx.getSource().sendFeedback(Component.literal("Resource pack: " + result.zip().toAbsolutePath()));
+            ctx.getSource().sendFeedback(Component.literal("Plugin effects: " + result.effectsDir().toAbsolutePath()));
+            for (String warning : result.warnings()) {
+                ctx.getSource().sendFeedback(Component.literal("Warning: " + warning));
+            }
+        } catch (IOException e) {
+            ctx.getSource().sendError(Component.literal("Export failed: " + e.getMessage()));
+            return 0;
+        }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int demo(CommandContext<FabricClientCommandSource> ctx) {
+        EffectDefinition effect = GraphPresets.helix("demo_helix");
+        try {
+            EffectStore.save(effect);
+        } catch (IOException e) {
+            ctx.getSource().sendError(Component.literal("Could not save: " + e.getMessage()));
+            return 0;
+        }
+        EffectPreview.play(effect);
+        ctx.getSource().sendFeedback(Component.literal("Saved and playing 'demo_helix', a graph-driven helix. Stop it with /pfx stop"));
         return Command.SINGLE_SUCCESS;
     }
 
