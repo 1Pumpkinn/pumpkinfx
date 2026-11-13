@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "pumpkinfx",
+  "version": "${version}",
+  "name": "PumpkinFX",
+  "description": "A simple in-game particle effect editor with resource pack export.",
+  "authors": ["PumpkinDev"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["net.saturn.pumpkinfx.PumpkinFxClient"]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.1",
+    "minecraft": "~26.2",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}
