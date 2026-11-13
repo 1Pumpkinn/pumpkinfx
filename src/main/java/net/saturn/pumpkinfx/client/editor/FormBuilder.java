@@ -44,12 +44,20 @@ public final class FormBuilder {
     private record Swatch(int x, int y, int w, int h, IntSupplier color) {
     }
 
+    private record Plot(int x, int y, int w, int h, Curve curve) {
+    }
+
+    private record GradientBar(int x, int y, int w, int h, Gradient gradient) {
+    }
+
     private final Font font;
     private final Consumer<AbstractWidget> adder;
     private final int left;
     private final int width;
     private final List<Label> labels = new ArrayList<>();
     private final List<Swatch> swatches = new ArrayList<>();
+    private final List<Plot> plots = new ArrayList<>();
+    private final List<GradientBar> bars = new ArrayList<>();
     private int y;
     private int column;
 
@@ -71,6 +79,46 @@ public final class FormBuilder {
             graphics.fill(swatch.x() - 1, swatch.y() - 1, x2 + 1, y2 + 1, 0xFF000000);
             graphics.fill(swatch.x(), swatch.y(), x2, y2, 0xFF000000 | swatch.color().getAsInt());
         }
+        for (Plot plot : plots) {
+            renderPlot(graphics, plot);
+        }
+        for (GradientBar bar : bars) {
+            graphics.fill(bar.x() - 1, bar.y() - 1, bar.x() + bar.w() + 1, bar.y() + bar.h() + 1, 0xFF000000);
+            for (int i = 0; i < bar.w(); i++) {
+                int rgb = bar.gradient().evaluate(i / (float) Math.max(1, bar.w() - 1));
+                graphics.fill(bar.x() + i, bar.y(), bar.x() + i + 1, bar.y() + bar.h(), 0xFF000000 | rgb);
+            }
+        }
+    }
+
+    private static int plotY(Plot p, float value, float lo, float hi) {
+        float t = (value - lo) / (hi - lo);
+        int py = p.y() + Math.round((1f - t) * (p.h() - 2));
+        return Math.max(p.y(), Math.min(p.y() + p.h() - 2, py));
+    }
+
+    private void renderPlot(GuiGraphicsExtractor graphics, Plot p) {
+        graphics.fill(p.x() - 1, p.y() - 1, p.x() + p.w() + 1, p.y() + p.h() + 1, 0xFF000000);
+        graphics.fill(p.x(), p.y(), p.x() + p.w(), p.y() + p.h(), 0xFF1E1E1E);
+        float[] bounds = p.curve().bounds();
+        float lo = Math.min(0f, bounds[0]);
+        float hi = Math.max(lo + 0.0001f, bounds[1]);
+        int zero = plotY(p, 0f, lo, hi);
+        graphics.fill(p.x(), zero, p.x() + p.w(), zero + 1, 0xFF444444);
+        float[] samples = p.curve().sample(p.w());
+        for (int i = 0; i < samples.length; i++) {
+            int py = plotY(p, samples[i], lo, hi);
+            graphics.fill(p.x() + i, py, p.x() + i + 1, py + 2, 0xFF55AAFF);
+        }
+        for (Keyframe key : p.curve().keys) {
+            int kx = p.x() + Math.round(key.time() * (p.w() - 1));
+            int ky = plotY(p, key.value(), lo, hi);
+            graphics.fill(kx - 2, ky - 1, kx + 3, ky + 3, 0xFFFFD27F);
+        }
+        graphics.text(font, formatFloat(hi), p.x() + 3, p.y() + 2, NOTE_COLOR, false);
+        if (lo != 0f) {
+            graphics.text(font, formatFloat(lo), p.x() + 3, p.y() + p.h() - 10, NOTE_COLOR, false);
+        }
     }
 
     public void section(String title) {
@@ -82,6 +130,12 @@ public final class FormBuilder {
     public void note(String text) {
         endRow();
         labels.add(new Label(text, left, y + 2, NOTE_COLOR));
+        y += 12;
+    }
+
+    public void note(String text, int color) {
+        endRow();
+        labels.add(new Label(text, left, y + 2, color));
         y += 12;
     }
 
@@ -169,19 +223,18 @@ public final class FormBuilder {
         endRow();
         labels.add(new Label("Time (0-1)", left, y + 2, NOTE_COLOR));
         labels.add(new Label("Value", left + 68, y + 2, NOTE_COLOR));
+        labels.add(new Label("Blend to next", left + 176, y + 2, NOTE_COLOR));
         y += 12;
         for (int i = 0; i < curve.keys.size(); i++) {
             int index = i;
             Keyframe key = curve.keys.get(i);
             EditBox time = rawBox(left, 64, formatFloat(key.time()), 10);
             bind(time, s -> s.matches(UNSIGNED_FLOAT), s -> parseFloat(s, v -> {
-                Keyframe old = curve.keys.get(index);
-                curve.keys.set(index, new Keyframe(Math.max(0f, Math.min(1f, v)), old.value()));
+                curve.keys.set(index, curve.keys.get(index).withTime(Math.max(0f, Math.min(1f, v))));
             }));
             EditBox value = rawBox(left + 68, 80, formatFloat(key.value()), 12);
             bind(value, s -> s.matches(SIGNED_FLOAT), s -> parseFloat(s, v -> {
-                Keyframe old = curve.keys.get(index);
-                curve.keys.set(index, new Keyframe(old.time(), v));
+                curve.keys.set(index, curve.keys.get(index).withValue(v));
             }));
             adder.accept(time);
             adder.accept(value);
@@ -189,6 +242,12 @@ public final class FormBuilder {
                 curve.removeAt(index);
                 rebuild.run();
             }));
+            adder.accept(Button.builder(Component.literal(key.interp().displayName()), b -> {
+                if (index < curve.keys.size()) {
+                    curve.setInterp(index, curve.keys.get(index).interp().next());
+                    b.setMessage(Component.literal(curve.keys.get(index).interp().displayName()));
+                }
+            }).bounds(left + 176, y, 56, ROW).build());
             y += ROW + GAP;
         }
         Button add = Button.builder(Component.literal("+ Key"), b -> {
@@ -198,6 +257,8 @@ public final class FormBuilder {
         add.active = curve.keys.size() < MAX_KEYS;
         adder.accept(add);
         y += ROW + GAP;
+        plots.add(new Plot(left, y + 2, Math.min(232, width), 60, curve));
+        y += 60 + GAP + 4;
     }
 
     public void gradient(Gradient gradient, Runnable rebuild) {
@@ -242,6 +303,8 @@ public final class FormBuilder {
         add.active = gradient.stops.size() < MAX_KEYS;
         adder.accept(add);
         y += ROW + GAP;
+        bars.add(new GradientBar(left, y + 2, Math.min(232, width), 14, gradient));
+        y += 14 + GAP + 4;
     }
 
     public static void bind(EditBox box, Predicate<String> valid, Consumer<String> onValid) {

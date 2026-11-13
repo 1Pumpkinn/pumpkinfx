@@ -7,16 +7,20 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.saturn.pumpkinfx.client.EffectPreview;
+import net.saturn.pumpkinfx.client.ParticleResolver;
 import net.saturn.pumpkinfx.PumpkinFxClient;
 import net.saturn.pumpkinfx.export.ExportService;
 import net.saturn.pumpkinfx.export.PackExporter;
 import net.saturn.pumpkinfx.model.DirectionMode;
 import net.saturn.pumpkinfx.model.EffectDefinition;
+import net.saturn.pumpkinfx.model.EffectHistory;
+import net.saturn.pumpkinfx.model.EffectValidator;
 import net.saturn.pumpkinfx.model.EmitterDefinition;
 import net.saturn.pumpkinfx.model.EmitterShape;
 import net.saturn.pumpkinfx.storage.EffectStore;
 
 import java.io.IOException;
+import java.util.List;
 
 public final class EditorScreen extends Screen {
     private enum Page {
@@ -24,7 +28,9 @@ public final class EditorScreen extends Screen {
         SHAPE("Shape"),
         MOTION("Motion"),
         LOOK("Look"),
-        CURVES("Curves");
+        CURVES("Curves"),
+        TIMELINE("Time"),
+        ISSUES("Issues");
 
         private final String label;
 
@@ -56,7 +62,10 @@ public final class EditorScreen extends Screen {
     private static final int PANEL_X = 120;
     private static final int WHITE = 0xFFFFFFFF;
 
+    private static final long COMMIT_INTERVAL_NANOS = 400_000_000L;
+
     private static EffectDefinition session;
+    private static EffectHistory history;
     private static int selected;
     private static int listOffset;
     private static Page page = Page.GENERAL;
@@ -64,6 +73,7 @@ public final class EditorScreen extends Screen {
 
     private FormBuilder form;
     private String status = "";
+    private long lastCommit;
 
     public EditorScreen() {
         super(Component.literal("PumpkinFX Editor"));
@@ -71,6 +81,7 @@ public final class EditorScreen extends Screen {
 
     public static void open(EffectDefinition effect) {
         session = effect;
+        history = new EffectHistory(effect);
         selected = 0;
         listOffset = 0;
         Minecraft.getInstance().gui.setScreen(new EditorScreen());
@@ -79,6 +90,7 @@ public final class EditorScreen extends Screen {
     public static void openLast() {
         if (session == null) {
             session = EffectDefinition.createDefault("untitled");
+            history = new EffectHistory(session);
         }
         Minecraft.getInstance().gui.setScreen(new EditorScreen());
     }
@@ -92,6 +104,9 @@ public final class EditorScreen extends Screen {
         if (session == null) {
             session = EffectDefinition.createDefault("untitled");
         }
+        if (history == null) {
+            history = new EffectHistory(session);
+        }
         if (session.emitters.isEmpty()) {
             session.addEmitter();
         }
@@ -101,6 +116,7 @@ public final class EditorScreen extends Screen {
         buildEmitterList();
         buildTabs();
         buildPage();
+        buildBottomBar();
     }
 
     @Override
@@ -110,6 +126,15 @@ public final class EditorScreen extends Screen {
         graphics.text(this.font, "Emitters", 8, 25, FormBuilder.HEADER_COLOR, false);
         if (form != null) {
             form.render(graphics);
+        }
+        if (page == Page.TIMELINE) {
+            drawTimeline(graphics);
+        }
+        graphics.text(this.font, "Seed", PANEL_X + 150, this.height - 29, FormBuilder.LABEL_COLOR, false);
+        long now = System.nanoTime();
+        if (now - lastCommit > COMMIT_INTERVAL_NANOS) {
+            history.commit(session);
+            lastCommit = now;
         }
         if (!status.isEmpty()) {
             graphics.text(this.font, status, PANEL_X, this.height - 14, WHITE, false);
@@ -228,6 +253,7 @@ public final class EditorScreen extends Screen {
             Page target = pages[i];
             String label = target == page ? "[" + target.label + "]" : target.label;
             addRenderableWidget(Button.builder(Component.literal(label), b -> {
+                commitNow();
                 page = target;
                 rebuildWidgets();
             }).bounds(PANEL_X + i * tabW, LIST_TOP, tabW - 2, 18).build());
@@ -243,6 +269,141 @@ public final class EditorScreen extends Screen {
             case MOTION -> buildMotion(e);
             case LOOK -> buildLook(e);
             case CURVES -> buildCurves(e);
+            case TIMELINE -> buildTimeline();
+            case ISSUES -> buildIssues();
+        }
+    }
+
+    private void buildBottomBar() {
+        int y = this.height - 34;
+        addRenderableWidget(Button.builder(Component.literal("Undo"), b -> undo())
+                .bounds(PANEL_X, y, 36, 18).build());
+        addRenderableWidget(Button.builder(Component.literal("Redo"), b -> redo())
+                .bounds(PANEL_X + 40, y, 36, 18).build());
+        addRenderableWidget(Button.builder(Component.literal("Up"), b -> moveSelected(-1))
+                .bounds(PANEL_X + 84, y, 28, 18).build());
+        addRenderableWidget(Button.builder(Component.literal("Dn"), b -> moveSelected(1))
+                .bounds(PANEL_X + 116, y, 28, 18).build());
+
+        EditBox seed = new EditBox(this.font, PANEL_X + 176, y, 74, 18, Component.literal("Seed"));
+        seed.setMaxLength(18);
+        seed.setValue(Long.toString(session.seed));
+        FormBuilder.bind(seed, s -> s.matches("\\d{0,18}"), s -> {
+            try {
+                session.seed = s.isEmpty() ? 0L : Long.parseLong(s);
+            } catch (NumberFormatException ignored) {
+            }
+        });
+        addRenderableWidget(seed);
+    }
+
+    private void commitNow() {
+        history.commit(session);
+        lastCommit = System.nanoTime();
+    }
+
+    private void undo() {
+        commitNow();
+        applyHistory(history.undo(), "Nothing to undo");
+    }
+
+    private void redo() {
+        commitNow();
+        applyHistory(history.redo(), "Nothing to redo");
+    }
+
+    private void applyHistory(EffectDefinition restored, String emptyMessage) {
+        if (restored == null) {
+            status = emptyMessage;
+            return;
+        }
+        session = restored;
+        if (session.emitters.isEmpty()) {
+            session.addEmitter();
+        }
+        selected = Math.max(0, Math.min(selected, session.emitters.size() - 1));
+        status = "";
+        rebuildWidgets();
+    }
+
+    private void moveSelected(int delta) {
+        commitNow();
+        if (session.moveEmitter(selected, selected + delta)) {
+            selected += delta;
+        }
+        rebuildWidgets();
+    }
+
+    private void buildTimeline() {
+        form.note("Bars show when each emitter runs across the effect's ticks.");
+        form.note("Light = looping, gold tick = burst. Edit timings on the General tab.");
+    }
+
+    private void buildIssues() {
+        List<EffectValidator.Issue> issues = EffectValidator.validate(session, ParticleResolver::isKnown);
+        if (issues.isEmpty()) {
+            form.note("No problems found.", 0xFF55FF55);
+            return;
+        }
+        int maxChars = Math.max(20, (this.width - PANEL_X - 8) / 6);
+        int shown = 0;
+        for (EffectValidator.Issue issue : issues) {
+            if (shown++ >= 14) {
+                form.note("... and " + (issues.size() - 14) + " more", FormBuilder.NOTE_COLOR);
+                break;
+            }
+            int color = switch (issue.severity()) {
+                case ERROR -> 0xFFFF5555;
+                case WARNING -> 0xFFFFD27F;
+                case INFO -> FormBuilder.NOTE_COLOR;
+            };
+            String text = issue.toString();
+            if (text.length() > maxChars) {
+                text = text.substring(0, maxChars - 3) + "...";
+            }
+            form.note(text, color);
+        }
+    }
+
+    private void drawTimeline(GuiGraphicsExtractor graphics) {
+        int labelW = 70;
+        int top = LIST_TOP + 26 + 28;
+        int barX = PANEL_X + labelW;
+        int barW = Math.max(20, this.width - 8 - barX);
+        int total = Math.max(1, session.duration);
+
+        graphics.text(this.font, "0", barX, top, FormBuilder.NOTE_COLOR, false);
+        String end = Integer.toString(total);
+        graphics.text(this.font, end, barX + barW - end.length() * 6, top, FormBuilder.NOTE_COLOR, false);
+
+        for (int i = 0; i < session.emitters.size(); i++) {
+            int rowY = top + 14 + i * 16;
+            if (rowY > this.height - 46) {
+                break;
+            }
+            EmitterDefinition e = session.emitters.get(i);
+            String name = e.name.length() > 11 ? e.name.substring(0, 11) : e.name;
+            int nameColor = i == selected ? FormBuilder.HEADER_COLOR
+                    : (e.enabled ? FormBuilder.LABEL_COLOR : FormBuilder.NOTE_COLOR);
+            graphics.text(this.font, name, PANEL_X, rowY + 2, nameColor, false);
+            graphics.fill(barX, rowY, barX + barW, rowY + 12, 0xFF1E1E1E);
+
+            int start = Math.min(total, e.startDelay);
+            int firstEnd = Math.min(total, e.startDelay + e.duration);
+            int solid = !e.enabled ? 0xFF555555 : (i == selected ? 0xFF55AAFF : 0xFF3A7ACC);
+            int faded = !e.enabled ? 0xFF3A3A3A : 0xFF2A5A8F;
+            int xs = barX + (int) ((long) start * barW / total);
+            int xe = barX + (int) ((long) firstEnd * barW / total);
+            if (start < total) {
+                graphics.fill(xs, rowY, Math.max(xs + 1, xe), rowY + 12, solid);
+                if (e.loop && firstEnd < total) {
+                    graphics.fill(xe, rowY, barX + barW, rowY + 12, faded);
+                }
+            }
+            if (e.burstCount > 0 && e.startDelay + e.burstTick < total) {
+                int bx = barX + (int) ((long) (e.startDelay + e.burstTick) * barW / total);
+                graphics.fill(bx, rowY - 2, bx + 1, rowY + 14, 0xFFFFD27F);
+            }
         }
     }
 

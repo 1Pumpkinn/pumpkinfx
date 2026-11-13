@@ -7,6 +7,7 @@ import com.google.gson.JsonObject;
 import net.saturn.pumpkinfx.model.EffectDefinition;
 import net.saturn.pumpkinfx.model.EffectIds;
 import net.saturn.pumpkinfx.model.EffectSerializer;
+import net.saturn.pumpkinfx.model.EffectValidator;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -64,6 +65,11 @@ public final class PackExporter {
                 warnings.add("Duplicate effect id '" + effect.id + "', the later one wins");
             } else {
                 ids.add(effect.id);
+            }
+            for (EffectValidator.Issue issue : EffectValidator.validate(effect, null)) {
+                if (issue.severity() != EffectValidator.Severity.INFO) {
+                    warnings.add("[" + effect.id + "] " + issue);
+                }
             }
             EffectSerializer.save(effectsDir.resolve(effect.id + ".json"), effect);
         }

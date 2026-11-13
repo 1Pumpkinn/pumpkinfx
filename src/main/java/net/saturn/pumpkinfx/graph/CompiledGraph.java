@@ -165,6 +165,11 @@ public final class CompiledGraph {
             case LERP -> lerp(out, input(n, 0), input(n, 1), input(n, 2));
             case REMAP -> remap(out, input(n, 0), input(n, 1), input(n, 2), input(n, 3), input(n, 4));
             case SMOOTHSTEP -> smoothstep(out, input(n, 0), input(n, 1), input(n, 2));
+            case FLOOR -> unary(out, input(n, 0), 5);
+            case SQRT -> unary(out, input(n, 0), 6);
+            case SATURATE -> unary(out, input(n, 0), 7);
+            case STEP -> step(out, input(n, 0), input(n, 1));
+            case MOD -> mod(out, input(n, 0), input(n, 1));
             case COMBINE -> set(out, input(n, 0)[0], input(n, 1)[0], input(n, 2)[0]);
             case SPLIT_X -> fill(out, input(n, 0)[0]);
             case SPLIT_Y -> fill(out, input(n, 0)[1]);
@@ -172,10 +177,38 @@ public final class CompiledGraph {
             case NORMALIZE -> normalize(out, input(n, 0));
             case LENGTH -> fill(out, length(input(n, 0)));
             case ROTATE_Y -> rotateY(out, input(n, 0), input(n, 1)[0]);
+            case SCALE -> {
+                double[] v = input(n, 0);
+                double f = input(n, 1)[0];
+                set(out, v[0] * f, v[1] * f, v[2] * f);
+            }
+            case DOT -> {
+                double[] a = input(n, 0);
+                double[] b = input(n, 1);
+                fill(out, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]);
+            }
+            case CROSS -> {
+                double[] a = input(n, 0);
+                double[] b = input(n, 1);
+                set(out, a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]);
+            }
+            case DISTANCE -> {
+                double[] a = input(n, 0);
+                double[] b = input(n, 1);
+                double dx = a[0] - b[0];
+                double dy = a[1] - b[1];
+                double dz = a[2] - b[2];
+                fill(out, Math.sqrt(dx * dx + dy * dy + dz * dz));
+            }
             case NOISE -> {
                 double[] p = input(n, 0);
                 double s = input(n, 1)[0];
                 fill(out, Noise.value3(p[0] * s, p[1] * s, p[2] * s));
+            }
+            case FBM -> {
+                double[] p = input(n, 0);
+                double s = input(n, 1)[0];
+                fill(out, Noise.fbm3(p[0] * s, p[1] * s, p[2] * s, (int) Math.round(input(n, 2)[0])));
             }
             case CURVE -> {
                 double[] x = input(n, 0);
@@ -226,8 +259,23 @@ public final class CompiledGraph {
                 case 1 -> Math.cos(a[k]);
                 case 2 -> Math.abs(a[k]);
                 case 3 -> a[k] - Math.floor(a[k]);
-                default -> -a[k];
+                case 4 -> -a[k];
+                case 5 -> Math.floor(a[k]);
+                case 6 -> Math.sqrt(Math.max(0.0, a[k]));
+                default -> Math.max(0.0, Math.min(1.0, a[k]));
             };
+        }
+    }
+
+    private static void step(double[] out, double[] edge, double[] x) {
+        for (int k = 0; k < 3; k++) {
+            out[k] = x[k] < edge[k] ? 0.0 : 1.0;
+        }
+    }
+
+    private static void mod(double[] out, double[] a, double[] b) {
+        for (int k = 0; k < 3; k++) {
+            out[k] = b[k] == 0 ? 0 : a[k] - b[k] * Math.floor(a[k] / b[k]);
         }
     }
 

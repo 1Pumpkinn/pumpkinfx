@@ -9,23 +9,36 @@ import net.saturn.pumpkinfx.model.EmitterDefinition;
 import net.saturn.pumpkinfx.model.ShapeSampler;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.SplittableRandom;
 import java.util.random.RandomGenerator;
 
 public final class EffectRunner {
-    private static final int MAX_PER_EMITTER = 200;
-    private static final int MAX_PER_TICK = 400;
+    public static final int MAX_PER_EMITTER = 200;
+    public static final int MAX_PER_TICK = 400;
 
     private final EffectDefinition effect;
-    private final RandomGenerator rng;
+    private final Long seed;
+    private RandomGenerator rng;
     private final double[] accumulators;
     private final CompiledGraph[] graphs;
     private final List<String> warnings = new ArrayList<>();
     private int tick;
 
     public EffectRunner(EffectDefinition effect, RandomGenerator rng) {
+        this(effect, rng, null);
+    }
+
+    /** A runner whose output is identical every time it is played or reset with the same seed. */
+    public static EffectRunner seeded(EffectDefinition effect, long seed) {
+        return new EffectRunner(effect, new SplittableRandom(seed), seed);
+    }
+
+    private EffectRunner(EffectDefinition effect, RandomGenerator rng, Long seed) {
         this.effect = effect;
         this.rng = rng;
+        this.seed = seed;
         int count = effect.emitters.size();
         this.accumulators = new double[count];
         this.graphs = new CompiledGraph[count];
@@ -41,6 +54,39 @@ public final class EffectRunner {
 
     public int tick() {
         return tick;
+    }
+
+    /** How far through the effect we are, 0-1. Loops wrap around. */
+    public float progress() {
+        int d = Math.max(1, effect.duration);
+        return effect.loop ? (tick % d) / (float) d : Math.min(1f, tick / (float) d);
+    }
+
+    public boolean isSeeded() {
+        return seed != null;
+    }
+
+    /** Rewinds to tick 0. Seeded runners then replay exactly as before; unseeded ones will differ. */
+    public void reset() {
+        tick = 0;
+        Arrays.fill(accumulators, 0.0);
+        if (seed != null) {
+            rng = new SplittableRandom(seed);
+        }
+    }
+
+    /**
+     * Jumps to {@code target} ticks by silently simulating from the start (or from the current
+     * tick when moving forward). Only reproducible for seeded runners.
+     */
+    public void seek(int target) {
+        target = Math.max(0, target);
+        if (target < tick) {
+            reset();
+        }
+        while (tick < target && !finished()) {
+            step();
+        }
     }
 
     public List<String> warnings() {

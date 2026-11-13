@@ -28,6 +28,11 @@ public enum NodeType {
     LERP("Lerp", Category.MATH, new double[]{0, 1, 0.5}, "A", "B", "T"),
     REMAP("Remap", Category.MATH, new double[]{0, 0, 1, 0, 1}, "X", "In min", "In max", "Out min", "Out max"),
     SMOOTHSTEP("Smoothstep", Category.MATH, new double[]{0, 0, 1}, "X", "Edge 0", "Edge 1"),
+    FLOOR("Floor", Category.MATH, "X"),
+    SATURATE("Saturate", Category.MATH, "X"),
+    SQRT("Square root", Category.MATH, "X"),
+    STEP("Step", Category.MATH, new double[]{0.5, 0}, "Edge", "X"),
+    MOD("Modulo", Category.MATH, new double[]{0, 1}, "A", "B"),
 
     COMBINE("Combine", Category.VECTOR, "X", "Y", "Z"),
     SPLIT_X("Split X", Category.VECTOR, "Vec"),
@@ -36,8 +41,13 @@ public enum NodeType {
     NORMALIZE("Normalize", Category.VECTOR, "Vec"),
     LENGTH("Length", Category.VECTOR, "Vec"),
     ROTATE_Y("Rotate Y", Category.VECTOR, "Vec", "Radians"),
+    SCALE("Scale vector", Category.VECTOR, new double[]{0, 1}, "Vec", "Factor"),
+    DOT("Dot", Category.VECTOR, "A", "B"),
+    CROSS("Cross", Category.VECTOR, "A", "B"),
+    DISTANCE("Distance", Category.VECTOR, "A", "B"),
 
     NOISE("Noise", Category.UTILITY, new double[]{0, 1}, "Position", "Scale"),
+    FBM("Fractal noise", Category.UTILITY, new double[]{0, 1, 4}, "Position", "Scale", "Octaves"),
     CURVE("Curve", Category.UTILITY, "X"),
     GRADIENT("Gradient", Category.UTILITY, "T"),
 
@@ -50,6 +60,15 @@ public enum NodeType {
 
     public enum Category {
         SOURCE, MATH, VECTOR, UTILITY, OUTPUT
+    }
+
+    /**
+     * What a node produces. Every value in the graph is stored as three numbers; this says how
+     * to read them. ANY means component-wise maths that follows whatever is plugged in.
+     * The editor uses it to colour ports, and shader code generation will use it to pick types.
+     */
+    public enum ValueKind {
+        SCALAR, VECTOR, COLOR, ANY
     }
 
     private final String displayName;
@@ -90,5 +109,16 @@ public enum NodeType {
 
     public boolean isOutput() {
         return category == Category.OUTPUT;
+    }
+
+    public ValueKind outputKind() {
+        return switch (this) {
+            case RANDOM_DIRECTION, SHAPE_POSITION, SHAPE_DIRECTION, VECTOR, COMBINE, NORMALIZE,
+                 ROTATE_Y, SCALE, CROSS, OUT_POSITION, OUT_DIRECTION -> ValueKind.VECTOR;
+            case COLOR, GRADIENT, OUT_COLOR -> ValueKind.COLOR;
+            case ADD, SUBTRACT, MULTIPLY, DIVIDE, MIN, MAX, POWER, SIN, COS, ABS, FRACT, NEGATE,
+                 CLAMP, LERP, REMAP, SMOOTHSTEP, FLOOR, SATURATE, SQRT, STEP, MOD, CURVE -> ValueKind.ANY;
+            default -> ValueKind.SCALAR;
+        };
     }
 }

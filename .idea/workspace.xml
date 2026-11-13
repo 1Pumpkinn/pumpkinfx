@@ -4,11 +4,26 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="dd0e2ea7-668f-4ca1-bb46-6167e6662f55" name="Changes" comment="Initital commit">
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/export/ExportService.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/export/PackExporter.java" afterDir="false" />
+    <list default="true" id="dd0e2ea7-668f-4ca1-bb46-6167e6662f55" name="Changes" comment="Batch 2: editor upgrades (undo/redo, live plots, timeline,&#10; issues)&#10;&#10;- Undo/Redo buttons backed by EffectHistory (snapshots every ~0.4s of edits,&#10;  and on tab switch / emitter operations).&#10;- Curves tab: live plot of the curve with key markers, and a per-key&#10;  &quot;Blend to next&quot; button (Linear / Smooth / Step).&#10;- Look tab: gradient preview bar under the colour stops.&#10;- New Time tab: bars showing when each emitter runs, loops and burst ticks.&#10;- New Issues tab: shows EffectValidator results with severity colours.&#10;- Emitter reorder (Up / Dn) and an effect seed box for repeatable playback.">
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/model/EffectHistory.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/model/EffectMigrations.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/model/EffectValidator.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/model/Interp.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/client/EffectPreview.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/client/EffectPreview.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/client/PfxCommands.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/client/PfxCommands.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/client/editor/EditorScreen.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/client/editor/EditorScreen.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/client/editor/FormBuilder.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/client/editor/FormBuilder.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/export/PackExporter.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/export/PackExporter.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/graph/CompiledGraph.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/graph/CompiledGraph.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/graph/GraphDefinition.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/graph/GraphDefinition.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/graph/NodeType.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/graph/NodeType.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/graph/Noise.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/graph/Noise.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/model/Curve.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/model/Curve.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/model/EffectDefinition.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/model/EffectDefinition.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/model/EffectSerializer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/model/EffectSerializer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/model/Keyframe.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/model/Keyframe.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/runtime/EffectRunner.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/saturn/pumpkinfx/runtime/EffectRunner.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -128,6 +143,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Initital commit" />
-    <option name="LAST_COMMIT_MESSAGE" value="Initital commit" />
+    <MESSAGE value="More commit" />
+    <option name="LAST_COMMIT_MESSAGE" value="More commit" />
   </component>
 </project>

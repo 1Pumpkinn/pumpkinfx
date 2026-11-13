@@ -1,8 +1,12 @@
 package net.saturn.pumpkinfx.graph;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public final class GraphDefinition {
@@ -62,6 +66,52 @@ public final class GraphDefinition {
         }
     }
 
+    /**
+     * Copies the given nodes (output nodes are skipped, there can only be one of each). Links
+     * between copied nodes are kept pointing at the copies; links to nodes that were not copied
+     * keep pointing at the originals, like duplicating in Blender. Returns the new nodes.
+     */
+    public List<GraphNode> duplicate(Collection<Integer> ids, float dx, float dy) {
+        Map<Integer, Integer> remap = new LinkedHashMap<>();
+        List<GraphNode> created = new ArrayList<>();
+        for (GraphNode node : nodes) {
+            if (!ids.contains(node.id) || node.type.isOutput()) {
+                continue;
+            }
+            GraphNode copy = node.copy();
+            copy.id = nextId++;
+            copy.x += dx;
+            copy.y += dy;
+            remap.put(node.id, copy.id);
+            created.add(copy);
+        }
+        for (GraphNode copy : created) {
+            for (Slot slot : copy.inputs) {
+                Integer mapped = slot.from < 0 ? null : remap.get(slot.from);
+                if (mapped != null) {
+                    slot.from = mapped;
+                }
+            }
+        }
+        nodes.addAll(created);
+        return created;
+    }
+
+    /** Arranges nodes in columns by how far they are from the inputs, so data flows left to right. */
+    public void autoLayout(float columnWidth, float rowHeight) {
+        Map<Integer, Integer> depth = new HashMap<>();
+        for (GraphNode node : nodes) {
+            depthOf(node, depth, new HashSet<>());
+        }
+        Map<Integer, Integer> rows = new HashMap<>();
+        for (GraphNode node : nodes) {
+            int column = depth.get(node.id);
+            int row = rows.merge(column, 1, Integer::sum) - 1;
+            node.x = column * columnWidth;
+            node.y = row * rowHeight;
+        }
+    }
+
     public boolean has(NodeType type) {
         for (GraphNode node : nodes) {
             if (node.type == type) {
@@ -105,6 +155,26 @@ public final class GraphDefinition {
             graph.nodes.add(node.copy());
         }
         return graph;
+    }
+
+    private int depthOf(GraphNode node, Map<Integer, Integer> memo, Set<Integer> path) {
+        Integer known = memo.get(node.id);
+        if (known != null) {
+            return known;
+        }
+        if (!path.add(node.id)) {
+            return 0;
+        }
+        int best = 0;
+        for (Slot slot : node.inputs) {
+            GraphNode upstream = slot.from < 0 ? null : get(slot.from);
+            if (upstream != null) {
+                best = Math.max(best, depthOf(upstream, memo, path) + 1);
+            }
+        }
+        path.remove(node.id);
+        memo.put(node.id, best);
+        return best;
     }
 
     private boolean dependsOn(GraphNode node, int targetId, Set<Integer> visited) {

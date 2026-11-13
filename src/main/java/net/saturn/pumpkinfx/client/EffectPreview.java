@@ -44,7 +44,11 @@ public final class EffectPreview {
         if (ACTIVE.size() >= MAX_INSTANCES) {
             ACTIVE.remove(0);
         }
-        ACTIVE.add(new Instance(new EffectRunner(effect.copy(), RNG), anchor(mc)));
+        EffectDefinition snapshot = effect.copy();
+        EffectRunner runner = snapshot.seed != 0L
+                ? EffectRunner.seeded(snapshot, snapshot.seed)
+                : new EffectRunner(snapshot, RNG);
+        ACTIVE.add(new Instance(runner, anchor(mc)));
     }
 
     public static void replay() {

@@ -13,6 +13,7 @@ import net.saturn.pumpkinfx.export.PackExporter;
 import net.saturn.pumpkinfx.graph.GraphPresets;
 import net.saturn.pumpkinfx.model.EffectDefinition;
 import net.saturn.pumpkinfx.model.EffectIds;
+import net.saturn.pumpkinfx.model.EffectValidator;
 import net.saturn.pumpkinfx.storage.EffectStore;
 
 import java.io.IOException;
@@ -39,6 +40,13 @@ public final class PfxCommands {
                                 .executes(ctx -> export(ctx, ExportService.lastName()))
                                 .then(ClientCommands.argument("name", StringArgumentType.word())
                                         .executes(ctx -> export(ctx, StringArgumentType.getString(ctx, "name")))))
+                        .then(ClientCommands.literal("validate")
+                                .then(ClientCommands.argument("id", StringArgumentType.word())
+                                        .suggests((ctx, builder) -> {
+                                            EffectStore.list().forEach(builder::suggest);
+                                            return builder.buildFuture();
+                                        })
+                                        .executes(PfxCommands::validate)))
                         .then(ClientCommands.literal("demo").executes(PfxCommands::demo))
                         .then(ClientCommands.literal("new")
                                 .then(ClientCommands.argument("id", StringArgumentType.word())
@@ -99,6 +107,29 @@ public final class PfxCommands {
             return 0;
         }
         return Command.SINGLE_SUCCESS;
+    }
+
+    private static int validate(CommandContext<FabricClientCommandSource> ctx) {
+        String id = EffectIds.sanitize(StringArgumentType.getString(ctx, "id"));
+        if (!EffectStore.exists(id)) {
+            ctx.getSource().sendError(Component.literal("No effect named '" + id + "'"));
+            return 0;
+        }
+        EffectDefinition effect;
+        try {
+            effect = EffectStore.load(id);
+        } catch (Exception e) {
+            ctx.getSource().sendError(Component.literal("Could not load '" + id + "': " + e.getMessage()));
+            return 0;
+        }
+        List<EffectValidator.Issue> issues = EffectValidator.validate(effect, ParticleResolver::isKnown);
+        if (issues.isEmpty()) {
+            ctx.getSource().sendFeedback(Component.literal("'" + id + "' looks good, no problems found"));
+        }
+        for (EffectValidator.Issue issue : issues) {
+            ctx.getSource().sendFeedback(Component.literal(issue.severity() + " " + issue));
+        }
+        return EffectValidator.hasErrors(issues) ? 0 : Command.SINGLE_SUCCESS;
     }
 
     private static int demo(CommandContext<FabricClientCommandSource> ctx) {

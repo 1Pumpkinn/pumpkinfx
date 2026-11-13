@@ -30,6 +30,22 @@ public final class Noise {
         return y0 + (y1 - y0) * w;
     }
 
+    /** Layered value noise, normalised so the result stays in -1..1. Octaves are clamped to 1-8. */
+    public static double fbm3(double x, double y, double z, int octaves) {
+        int count = Math.max(1, Math.min(8, octaves));
+        double sum = 0;
+        double total = 0;
+        double amplitude = 1;
+        double frequency = 1;
+        for (int i = 0; i < count; i++) {
+            sum += amplitude * value3(x * frequency, y * frequency, z * frequency);
+            total += amplitude;
+            amplitude *= 0.5;
+            frequency *= 2;
+        }
+        return sum / total;
+    }
+
     public static double hash01(long seed, long salt) {
         long z = seed + salt * 0x9E3779B97F4A7C15L;
         z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
@@ -43,7 +59,8 @@ public final class Noise {
     }
 
     private static double lattice(int i, int j, int k) {
-        long h = i * 374761393L + j * 668265263L + k * 2147483647L;
+        // The constant keeps (0,0,0) from hashing to 0, which made noise at the origin always -1.
+        long h = i * 374761393L + j * 668265263L + k * 2147483647L + 0x632BE59BD9B4E019L;
         h = (h ^ (h >>> 13)) * 1274126177L;
         h ^= h >>> 16;
         return ((h & 0xFFFFFFL) / (double) 0xFFFFFFL) * 2.0 - 1.0;

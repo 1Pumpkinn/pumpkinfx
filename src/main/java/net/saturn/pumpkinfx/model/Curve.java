@@ -16,6 +16,13 @@ public final class Curve {
         return curve;
     }
 
+    public static Curve of(Keyframe... frames) {
+        Curve curve = new Curve();
+        curve.keys.addAll(java.util.Arrays.asList(frames));
+        curve.sort();
+        return curve;
+    }
+
     public static Curve linear(float from, float to) {
         Curve curve = new Curve();
         curve.keys.add(new Keyframe(0f, from));
@@ -65,8 +72,39 @@ public final class Curve {
         if (index < 0 || index >= keys.size()) {
             return;
         }
-        keys.set(index, new Keyframe(clamp01(time), value));
+        keys.set(index, new Keyframe(clamp01(time), value, keys.get(index).interp()));
         sort();
+    }
+
+    public void setInterp(int index, Interp interp) {
+        if (index < 0 || index >= keys.size()) {
+            return;
+        }
+        keys.set(index, keys.get(index).withInterp(interp));
+    }
+
+    /** Evaluates the curve at {@code count} evenly spaced points from 0 to 1, for drawing. */
+    public float[] sample(int count) {
+        count = Math.max(2, count);
+        float[] out = new float[count];
+        for (int i = 0; i < count; i++) {
+            out[i] = evaluate(i / (float) (count - 1));
+        }
+        return out;
+    }
+
+    /** Smallest and largest key value, {@code {min, max}}. */
+    public float[] bounds() {
+        if (keys == null || keys.isEmpty()) {
+            return new float[]{0f, 0f};
+        }
+        float min = Float.POSITIVE_INFINITY;
+        float max = Float.NEGATIVE_INFINITY;
+        for (Keyframe key : keys) {
+            min = Math.min(min, key.value());
+            max = Math.max(max, key.value());
+        }
+        return new float[]{min, max};
     }
 
     public float evaluate(float t) {
@@ -90,7 +128,7 @@ public final class Curve {
                 if (span <= 0f) {
                     return b.value();
                 }
-                float f = (t - a.time()) / span;
+                float f = a.interp().apply((t - a.time()) / span);
                 return a.value() + (b.value() - a.value()) * f;
             }
         }
