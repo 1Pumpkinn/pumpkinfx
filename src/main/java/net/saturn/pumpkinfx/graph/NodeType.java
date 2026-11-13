@@ -56,10 +56,17 @@ public enum NodeType {
     OUT_SIZE("Output: size", Category.OUTPUT, new double[]{1}, "Size"),
     OUT_COLOR("Output: colour", Category.OUTPUT, new double[]{1}, "Colour"),
     OUT_POSITION("Output: position", Category.OUTPUT, "Position"),
-    OUT_DIRECTION("Output: direction", Category.OUTPUT, "Direction");
+    OUT_DIRECTION("Output: direction", Category.OUTPUT, "Direction"),
+
+    SH_UV("Shader: atlas UV", Category.SHADER),
+    SH_FRAG_POS("Shader: screen position", Category.SHADER),
+    SH_BASE_COLOR("Shader: vanilla colour", Category.SHADER),
+    SH_BASE_ALPHA("Shader: vanilla alpha", Category.SHADER),
+    SH_OUT_COLOR("Shader output: colour", Category.OUTPUT, new double[]{1}, "Colour"),
+    SH_OUT_ALPHA("Shader output: alpha", Category.OUTPUT, new double[]{1}, "Alpha");
 
     public enum Category {
-        SOURCE, MATH, VECTOR, UTILITY, OUTPUT
+        SOURCE, MATH, VECTOR, UTILITY, SHADER, OUTPUT
     }
 
     /**
@@ -111,11 +118,16 @@ public enum NodeType {
         return category == Category.OUTPUT;
     }
 
+    /** Outputs that feed the generated particle fragment shader rather than the CPU spawner. */
+    public boolean isShaderOutput() {
+        return this == SH_OUT_COLOR || this == SH_OUT_ALPHA;
+    }
+
     public ValueKind outputKind() {
         return switch (this) {
             case RANDOM_DIRECTION, SHAPE_POSITION, SHAPE_DIRECTION, VECTOR, COMBINE, NORMALIZE,
-                 ROTATE_Y, SCALE, CROSS, OUT_POSITION, OUT_DIRECTION -> ValueKind.VECTOR;
-            case COLOR, GRADIENT, OUT_COLOR -> ValueKind.COLOR;
+                 ROTATE_Y, SCALE, CROSS, OUT_POSITION, OUT_DIRECTION, SH_UV, SH_FRAG_POS -> ValueKind.VECTOR;
+            case COLOR, GRADIENT, OUT_COLOR, SH_BASE_COLOR, SH_OUT_COLOR -> ValueKind.COLOR;
             case ADD, SUBTRACT, MULTIPLY, DIVIDE, MIN, MAX, POWER, SIN, COS, ABS, FRACT, NEGATE,
                  CLAMP, LERP, REMAP, SMOOTHSTEP, FLOOR, SATURATE, SQRT, STEP, MOD, CURVE -> ValueKind.ANY;
             default -> ValueKind.SCALAR;

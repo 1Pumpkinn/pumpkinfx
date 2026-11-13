@@ -5,6 +5,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 import net.saturn.pumpkinfx.client.EffectPreview;
 import net.saturn.pumpkinfx.client.ParticleResolver;
@@ -19,6 +20,8 @@ import net.saturn.pumpkinfx.model.EmitterDefinition;
 import net.saturn.pumpkinfx.model.EmitterShape;
 import net.saturn.pumpkinfx.storage.EffectStore;
 
+import org.lwjgl.glfw.GLFW;
+
 import java.io.IOException;
 import java.util.List;
 
@@ -29,6 +32,7 @@ public final class EditorScreen extends Screen {
         MOTION("Motion"),
         LOOK("Look"),
         CURVES("Curves"),
+        GRAPH("Graph"),
         TIMELINE("Time"),
         ISSUES("Issues");
 
@@ -139,6 +143,26 @@ public final class EditorScreen extends Screen {
         if (!status.isEmpty()) {
             graphics.text(this.font, status, PANEL_X, this.height - 14, WHITE, false);
         }
+    }
+
+    @Override
+    public boolean keyPressed(KeyEvent event) {
+        if (event.hasControlDown()) {
+            int key = event.key();
+            if (key == GLFW.GLFW_KEY_Z) {
+                if (event.hasShiftDown()) {
+                    redo();
+                } else {
+                    undo();
+                }
+                return true;
+            }
+            if (key == GLFW.GLFW_KEY_Y) {
+                redo();
+                return true;
+            }
+        }
+        return super.keyPressed(event);
     }
 
     private void buildTopBar() {
@@ -269,6 +293,23 @@ public final class EditorScreen extends Screen {
             case MOTION -> buildMotion(e);
             case LOOK -> buildLook(e);
             case CURVES -> buildCurves(e);
+            case GRAPH -> form = GraphPanel.build(this.font, this::addRenderableWidget, e, PANEL_X, LIST_TOP + 26,
+                    this.height - 40, this.width - 8, new GraphPanel.Host() {
+                        @Override
+                        public void rebuild() {
+                            rebuildWidgets();
+                        }
+
+                        @Override
+                        public void commit() {
+                            commitNow();
+                        }
+
+                        @Override
+                        public void status(String text) {
+                            status = text;
+                        }
+                    });
             case TIMELINE -> buildTimeline();
             case ISSUES -> buildIssues();
         }
@@ -506,7 +547,8 @@ public final class EditorScreen extends Screen {
             EffectStore.save(session);
             PackExporter.Result result = ExportService.exportAll(ExportService.lastName());
             status = "Exported " + result.effectCount() + " effects, " + result.textureCount()
-                    + " textures to " + result.zip().getParent();
+                    + " textures to " + result.zip().getParent()
+                    + (result.shaderExported() ? ", particle shader patched" : "");
             if (!result.warnings().isEmpty()) {
                 status += " (" + result.warnings().size() + " warnings, see log)";
                 result.warnings().forEach(w -> PumpkinFxClient.LOGGER.warn("Export: {}", w));

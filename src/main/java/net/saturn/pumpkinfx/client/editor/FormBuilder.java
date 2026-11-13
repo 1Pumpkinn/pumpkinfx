@@ -121,6 +121,15 @@ public final class FormBuilder {
         }
     }
 
+    public void labelAt(String text, int x, int labelY, int color) {
+        labels.add(new Label(text, x, labelY, color));
+    }
+
+    public int y() {
+        endRow();
+        return y;
+    }
+
     public void section(String title) {
         endRow();
         labels.add(new Label(title, left, y + 6, HEADER_COLOR));

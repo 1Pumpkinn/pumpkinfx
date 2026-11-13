@@ -47,7 +47,9 @@ public final class PfxCommands {
                                             return builder.buildFuture();
                                         })
                                         .executes(PfxCommands::validate)))
-                        .then(ClientCommands.literal("demo").executes(PfxCommands::demo))
+                        .then(ClientCommands.literal("demo")
+                                .executes(PfxCommands::demo)
+                                .then(ClientCommands.literal("shader").executes(PfxCommands::demoShader)))
                         .then(ClientCommands.literal("new")
                                 .then(ClientCommands.argument("id", StringArgumentType.word())
                                         .executes(PfxCommands::create)))
@@ -96,7 +98,8 @@ public final class PfxCommands {
         try {
             PackExporter.Result result = ExportService.exportAll(name);
             ctx.getSource().sendFeedback(Component.literal("Exported " + result.effectCount() + " effects, "
-                    + result.textureCount() + " textures, " + result.overlayCount() + " pack files"));
+                    + result.textureCount() + " textures, " + result.overlayCount() + " pack files"
+                    + (result.shaderExported() ? ", patched particle shader" : "")));
             ctx.getSource().sendFeedback(Component.literal("Resource pack: " + result.zip().toAbsolutePath()));
             ctx.getSource().sendFeedback(Component.literal("Plugin effects: " + result.effectsDir().toAbsolutePath()));
             for (String warning : result.warnings()) {
@@ -142,6 +145,19 @@ public final class PfxCommands {
         }
         EffectPreview.play(effect);
         ctx.getSource().sendFeedback(Component.literal("Saved and playing 'demo_helix', a graph-driven helix. Stop it with /pfx stop"));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int demoShader(CommandContext<FabricClientCommandSource> ctx) {
+        EffectDefinition effect = GraphPresets.shaderTint("demo_shader");
+        try {
+            EffectStore.save(effect);
+        } catch (IOException e) {
+            ctx.getSource().sendError(Component.literal("Could not save: " + e.getMessage()));
+            return 0;
+        }
+        EffectPreview.play(effect);
+        ctx.getSource().sendFeedback(Component.literal("Saved and playing 'demo_shader'. Its shader only shows after /pfx export and loading the pack"));
         return Command.SINGLE_SUCCESS;
     }
 

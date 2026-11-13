@@ -220,8 +220,13 @@ public final class CompiledGraph {
                 int rgb = n.gradient.evaluate((float) input(n, 0)[0]);
                 set(out, ((rgb >> 16) & 0xFF) / 255.0, ((rgb >> 8) & 0xFF) / 255.0, (rgb & 0xFF) / 255.0);
             }
-            case OUT_RATE, OUT_SPEED, OUT_SIZE, OUT_COLOR, OUT_POSITION, OUT_DIRECTION ->
-                    System.arraycopy(input(n, 0), 0, out, 0, 3);
+            // Shader-only sources have no CPU meaning; these neutral values just keep the preview
+            // and the validator from tripping over a graph that also drives the shader.
+            case SH_UV, SH_FRAG_POS -> set(out, 0.5, 0.5, 0.0);
+            case SH_BASE_COLOR -> fill(out, 1.0);
+            case SH_BASE_ALPHA -> fill(out, 1.0);
+            case OUT_RATE, OUT_SPEED, OUT_SIZE, OUT_COLOR, OUT_POSITION, OUT_DIRECTION,
+                 SH_OUT_COLOR, SH_OUT_ALPHA -> System.arraycopy(input(n, 0), 0, out, 0, 3);
         }
     }
 

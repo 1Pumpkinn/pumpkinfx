@@ -28,7 +28,7 @@ public final class ParticleResolver {
     }
 
     public static ParticleOptions resolve(Spawn spawn) {
-        if (spawn.colored() && DUST.equals(spawn.particle())) {
+        if (DUST.equals(spawn.particle())) {
             float scale = Math.max(0.01f, Math.min(4f, spawn.size()));
             return new DustParticleOptions(spawn.rgb() & 0xFFFFFF, scale);
         }

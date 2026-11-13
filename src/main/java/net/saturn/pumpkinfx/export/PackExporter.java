@@ -8,6 +8,8 @@ import net.saturn.pumpkinfx.model.EffectDefinition;
 import net.saturn.pumpkinfx.model.EffectIds;
 import net.saturn.pumpkinfx.model.EffectSerializer;
 import net.saturn.pumpkinfx.model.EffectValidator;
+import net.saturn.pumpkinfx.shader.ShaderExport;
+import net.saturn.pumpkinfx.shader.VanillaShaders;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -33,7 +35,7 @@ public final class PackExporter {
 
     public record Result(String name, Path zip, Path effectsDir,
                          int effectCount, int textureCount, int overlayCount,
-                         List<String> warnings) {
+                         boolean shaderExported, List<String> warnings) {
     }
 
     private PackExporter() {
@@ -50,10 +52,14 @@ public final class PackExporter {
 
         Path zip = outDir.resolve(name + "-resourcepack.zip");
         Set<String> written = new HashSet<>();
+        ShaderExport.Entry shader = ShaderExport.plan(effects, VanillaShaders::particleFragment, warnings);
         int textures;
         int overlay;
         try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(zip))) {
             writeEntry(out, written, "pack.mcmeta", packMeta(name).getBytes(StandardCharsets.UTF_8));
+            if (shader != null) {
+                writeEntry(out, written, shader.path(), shader.data());
+            }
             textures = addTextures(out, written, textureDir, warnings);
             overlay = addOverlay(out, written, overlayDir, warnings);
         }
@@ -75,7 +81,7 @@ public final class PackExporter {
         }
         writeIndex(effectsDir.resolve("index.json"), name, ids);
 
-        return new Result(name, zip, effectsDir, ids.size(), textures, overlay, warnings);
+        return new Result(name, zip, effectsDir, ids.size(), textures, overlay, shader != null, warnings);
     }
 
     private static String packMeta(String name) {

@@ -73,6 +73,43 @@ public final class GraphPresets {
         return effect;
     }
 
+    /** A dust emitter whose particles are tinted with screen-space bands by the particle shader. */
+    public static EffectDefinition shaderTint(String id) {
+        EffectDefinition effect = new EffectDefinition(id, id);
+        effect.duration = 60;
+        effect.loop = true;
+
+        EmitterDefinition emitter = new EmitterDefinition("Tint");
+        emitter.particle = "minecraft:dust";
+        emitter.duration = 60;
+        emitter.loop = true;
+        emitter.shape = net.saturn.pumpkinfx.model.EmitterShape.SPHERE;
+        emitter.speed = net.saturn.pumpkinfx.model.Curve.constant(0.02f);
+
+        GraphDefinition g = emitter.graph;
+        GraphNode screen = g.add(NodeType.SH_FRAG_POS, 0, 0);
+        GraphNode base = g.add(NodeType.SH_BASE_COLOR, 0, 80);
+
+        GraphNode y = g.add(NodeType.SPLIT_Y, 140, 0);
+        g.link(y.id, 0, screen.id);
+        GraphNode scale = g.add(NodeType.MULTIPLY, 280, 0);
+        setDefault(scale, 1, 0.04);
+        g.link(scale.id, 0, y.id);
+        GraphNode band = g.add(NodeType.FRACT, 420, 0);
+        g.link(band.id, 0, scale.id);
+        GraphNode gradient = g.add(NodeType.GRADIENT, 560, 0);
+        gradient.gradient = Gradient.between(0xFF8A1F, 0x2F6BFF);
+        g.link(gradient.id, 0, band.id);
+        GraphNode tint = g.add(NodeType.MULTIPLY, 700, 40);
+        g.link(tint.id, 0, base.id);
+        g.link(tint.id, 1, gradient.id);
+        GraphNode outColor = g.add(NodeType.SH_OUT_COLOR, 840, 40);
+        g.link(outColor.id, 0, tint.id);
+
+        effect.emitters.add(emitter);
+        return effect;
+    }
+
     private static void setDefault(GraphNode node, int slot, double value) {
         Slot s = node.inputs.get(slot);
         s.x = value;

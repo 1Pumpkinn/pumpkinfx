@@ -4,6 +4,7 @@ import net.saturn.pumpkinfx.graph.CompiledGraph;
 import net.saturn.pumpkinfx.graph.GraphDefinition;
 import net.saturn.pumpkinfx.graph.NodeType;
 import net.saturn.pumpkinfx.runtime.EffectRunner;
+import net.saturn.pumpkinfx.shader.ShaderGraphCompiler;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -115,6 +116,14 @@ public final class EffectValidator {
                 out.add(new Issue(Severity.INFO, where, "Graph has no output node, so it has no effect"));
             } else {
                 compiled.warnings().forEach(w -> out.add(new Issue(Severity.WARNING, where, w)));
+            }
+            if (ShaderGraphCompiler.hasShaderOutput(graph)) {
+                out.add(new Issue(Severity.INFO, where,
+                        "Shader nodes only show up in the exported resource pack, and the particle shader affects every particle"));
+                ShaderGraphCompiler.Result shader = ShaderGraphCompiler.compile(graph.copy());
+                if (shader != null) {
+                    shader.warnings().forEach(w -> out.add(new Issue(Severity.WARNING, where, "Shader: " + w)));
+                }
             }
         }
     }
