@@ -1,5 +1,8 @@
 package net.saturn.pumpkinfx.runtime;
 
+import net.saturn.pumpkinfx.graph.CompiledGraph;
+import net.saturn.pumpkinfx.graph.EvalContext;
+import net.saturn.pumpkinfx.graph.NodeType;
 import net.saturn.pumpkinfx.model.DirectionMode;
 import net.saturn.pumpkinfx.model.EffectDefinition;
 import net.saturn.pumpkinfx.model.EmitterDefinition;
@@ -16,16 +19,32 @@ public final class EffectRunner {
     private final EffectDefinition effect;
     private final RandomGenerator rng;
     private final double[] accumulators;
+    private final CompiledGraph[] graphs;
+    private final List<String> warnings = new ArrayList<>();
     private int tick;
 
     public EffectRunner(EffectDefinition effect, RandomGenerator rng) {
         this.effect = effect;
         this.rng = rng;
-        this.accumulators = new double[effect.emitters.size()];
+        int count = effect.emitters.size();
+        this.accumulators = new double[count];
+        this.graphs = new CompiledGraph[count];
+        for (int i = 0; i < count; i++) {
+            CompiledGraph compiled = CompiledGraph.compile(effect.emitters.get(i).graph);
+            graphs[i] = compiled;
+            if (compiled != null) {
+                String name = effect.emitters.get(i).name;
+                compiled.warnings().forEach(w -> warnings.add(name + ": " + w));
+            }
+        }
     }
 
     public int tick() {
         return tick;
+    }
+
+    public List<String> warnings() {
+        return warnings;
     }
 
     public boolean finished() {
@@ -63,8 +82,13 @@ public final class EffectRunner {
         }
         int inCycle = local % emitter.duration;
         float progress = inCycle / (float) emitter.duration;
+        CompiledGraph graph = graphs[index];
 
-        accumulators[index] += Math.max(0f, emitter.rate.evaluate(progress));
+        double rate = emitter.rate.evaluate(progress);
+        if (graph != null && graph.has(NodeType.OUT_RATE)) {
+            rate = graph.evalScalar(NodeType.OUT_RATE, new EvalContext(progress, inCycle, 0, rng.nextLong()));
+        }
+        accumulators[index] += Math.max(0.0, rate);
         int count = (int) Math.floor(accumulators[index]);
         accumulators[index] -= count;
 
@@ -74,16 +98,26 @@ public final class EffectRunner {
         count = Math.min(count, MAX_PER_EMITTER);
 
         for (int n = 0; n < count && out.size() < MAX_PER_TICK; n++) {
-            out.add(spawnOne(emitter, progress));
+            out.add(spawnOne(emitter, graph, progress, inCycle, n));
         }
     }
 
-    private Spawn spawnOne(EmitterDefinition emitter, float progress) {
+    private Spawn spawnOne(EmitterDefinition emitter, CompiledGraph graph, float progress, int tickInCycle, int n) {
         ShapeSampler.Sample sample = ShapeSampler.sample(emitter, rng);
 
+        double px = sample.x();
+        double py = sample.y();
+        double pz = sample.z();
         double dx = sample.dx();
         double dy = sample.dy();
         double dz = sample.dz();
+
+        EvalContext ctx = null;
+        if (graph != null) {
+            ctx = new EvalContext(progress, tickInCycle, n, rng.nextLong());
+            ctx.setShape(px, py, pz, dx, dy, dz);
+        }
+
         if (emitter.direction == DirectionMode.UP) {
             dx = 0;
             dy = 1;
@@ -104,16 +138,55 @@ public final class EffectRunner {
         }
 
         double speed = emitter.speed.evaluate(progress);
+        double size = emitter.size.evaluate(progress);
+        int rgb = emitter.useColor ? emitter.color.evaluate(progress) : 0xFFFFFF;
+        boolean colored = emitter.useColor;
+
+        if (graph != null) {
+            if (graph.has(NodeType.OUT_POSITION)) {
+                double[] v = graph.eval(NodeType.OUT_POSITION, ctx);
+                px = v[0];
+                py = v[1];
+                pz = v[2];
+            }
+            if (graph.has(NodeType.OUT_DIRECTION)) {
+                double[] v = graph.eval(NodeType.OUT_DIRECTION, ctx);
+                double len = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+                if (len < 1.0e-9) {
+                    dx = 0;
+                    dy = 1;
+                    dz = 0;
+                } else {
+                    dx = v[0] / len;
+                    dy = v[1] / len;
+                    dz = v[2] / len;
+                }
+            }
+            if (graph.has(NodeType.OUT_SPEED)) {
+                speed = graph.evalScalar(NodeType.OUT_SPEED, ctx);
+            }
+            if (graph.has(NodeType.OUT_SIZE)) {
+                size = graph.evalScalar(NodeType.OUT_SIZE, ctx);
+                colored = true;
+            }
+            if (graph.has(NodeType.OUT_COLOR)) {
+                double[] v = graph.eval(NodeType.OUT_COLOR, ctx);
+                rgb = (channel(v[0]) << 16) | (channel(v[1]) << 8) | channel(v[2]);
+                colored = true;
+            }
+        }
+
         speed *= 1.0 + (rng.nextDouble() * 2.0 - 1.0) * emitter.speedRandom;
 
-        int rgb = emitter.useColor ? emitter.color.evaluate(progress) : 0xFFFFFF;
-        float size = emitter.useColor ? emitter.size.evaluate(progress) : 1f;
-
         return new Spawn(emitter.particle,
-                sample.x() + emitter.offsetX,
-                sample.y() + emitter.offsetY,
-                sample.z() + emitter.offsetZ,
+                px + emitter.offsetX,
+                py + emitter.offsetY,
+                pz + emitter.offsetZ,
                 dx * speed, dy * speed, dz * speed,
-                emitter.useColor, rgb, size);
+                colored, rgb, (float) size);
+    }
+
+    private static int channel(double v) {
+        return (int) Math.round(Math.max(0.0, Math.min(1.0, v)) * 255.0);
     }
 }

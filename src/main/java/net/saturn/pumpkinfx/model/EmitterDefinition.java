@@ -1,5 +1,7 @@
 package net.saturn.pumpkinfx.model;
 
+import net.saturn.pumpkinfx.graph.GraphDefinition;
+
 public final class EmitterDefinition {
     public String name = "Emitter";
     public boolean enabled = true;
@@ -37,6 +39,8 @@ public final class EmitterDefinition {
     public Gradient color = Gradient.solid(0xFFFFFF);
     public Curve size = Curve.constant(1f);
 
+    public GraphDefinition graph = new GraphDefinition();
+
     public EmitterDefinition() {
     }
 
@@ -69,6 +73,10 @@ public final class EmitterDefinition {
         if (color == null || color.stops == null || color.stops.isEmpty()) {
             color = Gradient.solid(0xFFFFFF);
         }
+        if (graph == null) {
+            graph = new GraphDefinition();
+        }
+        graph.normalize();
         rate.sort();
         speed.sort();
         size.sort();
@@ -109,6 +117,7 @@ public final class EmitterDefinition {
         e.useColor = useColor;
         e.color = color.copy();
         e.size = size.copy();
+        e.graph = graph.copy();
         return e;
     }
 }
